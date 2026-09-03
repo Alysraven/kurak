@@ -25,15 +25,11 @@ bash <(curl -sL https://raw.githubusercontent.com/Alysraven/kurak/main/kurak.sh)
 bash <(curl -sL https://raw.githubusercontent.com/Alysraven/kurak/main/kurak.sh) en
 ```
 
-### 4. 一键无人值守全自动执行 (直接跑完三步)
+### 4. 一键全自动执行 (自动安装 + 自动发 TG 通知)
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/Alysraven/kurak/main/kurak.sh) 1
+TG_TOKEN="你的BotToken" TG_CHAT_ID="你的ChatID" bash <(curl -sL https://raw.githubusercontent.com/Alysraven/kurak/main/kurak.sh) 1
 ```
-
-> **国内服务器镜像加速备用**：
-> ```bash
-> bash <(curl -sL https://ghproxy.net/https://raw.githubusercontent.com/Alysraven/kurak/main/kurak.sh)
-> ```
+*执行完毕后，Telegram 机器人会第一时间将面板链接、账号与密码直接推送到你的手机！*
 
 ---
 
@@ -53,6 +49,7 @@ k                   # 同样可直接唤出菜单
 | 命令 | 说明 |
 | :--- | :--- |
 | `kurak 1` 或 `kurak auto` | **一键全自动顺序执行全部 3 个步骤** |
+| `kurak tg` (或 `kurak 5`) | 配置 Telegram 机器人推送凭据 (安全保存在本地) |
 | `kurak update` (或 `kurak 2`) | 仅执行第 1 步：系统更新升级 (`apt update && apt upgrade -y`) |
 | `kurak bbr` (或 `kurak 3`) | 仅执行第 2 步：配置并启用 BBR 拥塞控制 (`99-bbr.conf`) |
 | `kurak 3x-ui` (或 `kurak 4`) | 仅执行第 3 步：下载并安装官方 3x-ui 面板 |

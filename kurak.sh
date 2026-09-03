@@ -301,6 +301,87 @@ step3_3xui() {
 
     bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
     echo -e "${CLR_GREEN}[OK] ${TXT_STEP3_OK}${CLR_RESET}"
+
+    # 发送 Telegram 通知 (若提供了 TG_TOKEN 和 TG_CHAT_ID)
+    send_tg_notification
+}
+
+# 发送 Telegram 部署凭据通知
+send_tg_notification() {
+    local token="${TG_TOKEN:-}"
+    local chat_id="${TG_CHAT_ID:-}"
+
+    # 支持从本地安全配置文件中读取 (仅 root 权限可读)
+    if [ -z "$token" ] && [ -f "$CONFIG_FILE" ]; then
+        token=$(grep '^TG_TOKEN=' "$CONFIG_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+        chat_id=$(grep '^TG_CHAT_ID=' "$CONFIG_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+    fi
+
+    # 如果未设置，跳过
+    if [ -z "$token" ] || [ -z "$chat_id" ]; then
+        return 0
+    fi
+
+    echo -e "${CLR_BLUE}[INFO] 正在向 Telegram Bot 推送部署凭据...${CLR_RESET}"
+
+    # 读取 3x-ui 生成的凭据文件
+    local u="" p="" port="" wbp="" access_url=""
+    if [ -f /etc/x-ui/install-result.env ]; then
+        u=$(grep '^XUI_USERNAME=' /etc/x-ui/install-result.env 2>/dev/null | cut -d'=' -f2- | tr -d "'" | tr -d '"')
+        p=$(grep '^XUI_PASSWORD=' /etc/x-ui/install-result.env 2>/dev/null | cut -d'=' -f2- | tr -d "'" | tr -d '"')
+        port=$(grep '^XUI_PANEL_PORT=' /etc/x-ui/install-result.env 2>/dev/null | cut -d'=' -f2- | tr -d "'" | tr -d '"')
+        wbp=$(grep '^XUI_WEB_BASE_PATH=' /etc/x-ui/install-result.env 2>/dev/null | cut -d'=' -f2- | tr -d "'" | tr -d '"')
+        access_url=$(grep '^XUI_ACCESS_URL=' /etc/x-ui/install-result.env 2>/dev/null | cut -d'=' -f2- | tr -d "'" | tr -d '"')
+    fi
+
+    local server_ip=$(sys_get_ip)
+    [ -z "$port" ] && port="39000"
+    [ -z "$access_url" ] && access_url="http://${server_ip}:${port}/${wbp}"
+
+    local msg="🎉 *3x-ui 自动化部署完成通知*
+━━━━━━━━━━━━━━
+🌐 *服务器 IP*: \`${server_ip}\`
+🔌 *面板端口*: \`${port}\`
+👤 *登录账号*: \`${u:-未知}\`
+🔑 *登录密码*: \`${p:-未知}\`
+🔗 *访问链接*: ${access_url}
+━━━━━━━━━━━━━━
+⚠️ *请妥善保管好您的登录凭据！*"
+
+    local resp
+    resp=$(curl -s -m 10 -X POST "https://api.telegram.org/bot${token}/sendMessage" \
+        -d "chat_id=${chat_id}" \
+        -d "parse_mode=Markdown" \
+        -d "text=${msg}" 2>/dev/null || true)
+
+    if echo "$resp" | grep -q '"ok":true'; then
+        echo -e "${CLR_GREEN}[OK] Telegram 通知已成功发送至你的专属 Bot！${CLR_RESET}"
+    else
+        echo -e "${CLR_YELLOW}[WARN] Telegram 通知发送失败，请检查网络或 Bot Token / Chat ID 是否正确。${CLR_RESET}"
+    fi
+}
+
+# 配置本地 TG 通知凭证 (安全保存在当前 VPS，永不上传 GitHub)
+setup_tg_config() {
+    echo -e "${CLR_CYAN}======================================================================${CLR_RESET}"
+    echo -e "                   ${CLR_BOLD}配置 Telegram 机器人推送${CLR_RESET}"
+    echo -e "${CLR_CYAN}======================================================================${CLR_RESET}"
+    echo -e "凭证将仅保存在服务器本地文件 (${CONFIG_FILE}) 中，权限 600，绝不公开。"
+    echo ""
+    read -rp "请输入你的 Telegram Bot Token: " input_token
+    read -rp "请输入你的 Telegram Chat ID: " input_chat_id
+
+    if [ -n "$input_token" ] && [ -n "$input_chat_id" ]; then
+        mkdir -p "$INSTALL_DIR"
+        sed -i '/^TG_TOKEN=/d' "$CONFIG_FILE" 2>/dev/null || true
+        sed -i '/^TG_CHAT_ID=/d' "$CONFIG_FILE" 2>/dev/null || true
+        echo "TG_TOKEN=\"${input_token}\"" >> "$CONFIG_FILE"
+        echo "TG_CHAT_ID=\"${input_chat_id}\"" >> "$CONFIG_FILE"
+        chmod 600 "$CONFIG_FILE"
+        echo -e "${CLR_GREEN}[OK] Telegram 推送凭证已成功保存至本地！${CLR_RESET}"
+    else
+        echo -e "${CLR_YELLOW}[WARN] 输入为空，未做更改。${CLR_RESET}"
+    fi
 }
 
 # 一键全自动执行 1 + 2 + 3
@@ -329,6 +410,8 @@ main_menu() {
         ui_menu_item "2" "${TXT_OPT_STEP1}" "${TXT_OPT_STEP1_DESC}"
         ui_menu_item "3" "${TXT_OPT_STEP2}" "${TXT_OPT_STEP2_DESC}"
         ui_menu_item "4" "${TXT_OPT_STEP3}" "${TXT_OPT_STEP3_DESC}"
+        echo -e "${CLR_CYAN}---------------------------- [ 通知设置 ] ----------------------------${CLR_RESET}"
+        ui_menu_item "5" "配置 Telegram 部署通知" "保存在 VPS 本地，安装完自动将账号密码推到手机"
         echo -e "${CLR_CYAN}----------------------------------------------------------------------${CLR_RESET}"
         ui_menu_item "0" "${TXT_OPT_EXIT}" ""
         echo -e "${CLR_CYAN}======================================================================${CLR_RESET}"
@@ -339,6 +422,7 @@ main_menu() {
             2) step1_update; ui_pause ;;
             3) step2_bbr; ui_pause ;;
             4) step3_3xui; ui_pause ;;
+            5) setup_tg_config; ui_pause ;;
             0)
                 echo -e "${CLR_GREEN}${TXT_BYE}${CLR_RESET}"
                 exit 0
@@ -365,6 +449,9 @@ cli_dispatch() {
             ;;
         3x-ui|3xui|ui|4)
             step3_3xui
+            ;;
+        tg|telegram|5)
+            setup_tg_config
             ;;
         -v|--version)
             echo "${APP_NAME} v${APP_VERSION}"
