@@ -293,11 +293,11 @@ step3_3xui() {
         apt update -y && apt install -y curl
     fi
 
-    # 注入全自动环境变量：指定端口 39000，其余全自动采用官方默认值
+    # 注入全自动环境变量：指定端口 39000，SSL 按 3x-ui 官方默认使用 IP 证书 (https)
     export XUI_NONINTERACTIVE=1
     export XUI_DB_TYPE="sqlite"
     export XUI_PANEL_PORT="39000"
-    export XUI_SSL_MODE="none"
+    export XUI_SSL_MODE="ip"
 
     bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
     echo -e "${CLR_GREEN}[OK] ${TXT_STEP3_OK}${CLR_RESET}"
