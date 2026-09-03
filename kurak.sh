@@ -286,12 +286,19 @@ EOF
     echo -e "${CLR_GREEN}[OK] ${TXT_STEP2_OK}${CLR_RESET}"
 }
 
-# 步骤 3：安装 3x-ui
+# 步骤 3：安装 3x-ui (指定端口 39000，其余配置全自动静默默认)
 step3_3xui() {
     echo -e "${CLR_BLUE}[INFO] ${TXT_STEP3_START}${CLR_RESET}"
     if ! command -v curl >/dev/null 2>&1; then
         apt update -y && apt install -y curl
     fi
+
+    # 注入全自动环境变量：指定端口 39000，其余全自动采用官方默认值
+    export XUI_NONINTERACTIVE=1
+    export XUI_DB_TYPE="sqlite"
+    export XUI_PANEL_PORT="39000"
+    export XUI_SSL_MODE="none"
+
     bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
     echo -e "${CLR_GREEN}[OK] ${TXT_STEP3_OK}${CLR_RESET}"
 }
