@@ -400,6 +400,31 @@ run_all_steps() {
     echo -e "${CLR_GREEN}======================================================================${CLR_RESET}"
 }
 
+# 卸载清理模块
+uninstall_all() {
+    echo -e "${CLR_YELLOW}======================================================================${CLR_RESET}"
+    echo -e "                   ${CLR_BOLD}卸载与清理向导${CLR_RESET}"
+    echo -e "${CLR_YELLOW}======================================================================${CLR_RESET}"
+    echo "本操作将停止并彻底移除 3x-ui 面板服务、相关配置，以及 KURAK 脚本和全局快捷键。"
+    echo ""
+    read -rp "确定要彻底卸载吗? [y/N]: " confirm_un
+    if [[ "$confirm_un" == "y" || "$confirm_un" == "Y" ]]; then
+        echo -e "${CLR_BLUE}[INFO] 正在卸载 3x-ui 面板...${CLR_RESET}"
+        systemctl stop x-ui >/dev/null 2>&1 || true
+        systemctl disable x-ui >/dev/null 2>&1 || true
+        rm -rf /usr/local/x-ui /etc/x-ui /usr/bin/x-ui /etc/systemd/system/x-ui.service
+        systemctl daemon-reload >/dev/null 2>&1 || true
+
+        echo -e "${CLR_BLUE}[INFO] 正在清理 KURAK 快捷键与脚本文件...${CLR_RESET}"
+        rm -rf /usr/local/share/kurak /usr/local/bin/kurak /usr/local/bin/k /usr/bin/kurak /usr/bin/k
+
+        echo -e "${CLR_GREEN}[OK] 3x-ui 面板与 KURAK 脚本已彻底卸载完毕！${CLR_RESET}"
+        exit 0
+    else
+        echo -e "${CLR_GREEN}操作已取消。${CLR_RESET}"
+    fi
+}
+
 # 交互式主菜单
 main_menu() {
     while true; do
@@ -410,8 +435,9 @@ main_menu() {
         ui_menu_item "2" "${TXT_OPT_STEP1}" "${TXT_OPT_STEP1_DESC}"
         ui_menu_item "3" "${TXT_OPT_STEP2}" "${TXT_OPT_STEP2_DESC}"
         ui_menu_item "4" "${TXT_OPT_STEP3}" "${TXT_OPT_STEP3_DESC}"
-        echo -e "${CLR_CYAN}---------------------------- [ 通知设置 ] ----------------------------${CLR_RESET}"
+        echo -e "${CLR_CYAN}---------------------------- [ 工具与设置 ] --------------------------${CLR_RESET}"
         ui_menu_item "5" "配置 Telegram 部署通知" "保存在 VPS 本地，安装完自动将账号密码推到手机"
+        ui_menu_item "9" "彻底卸载 3x-ui 与本脚本" "停止并清理面板服务与全局快捷键"
         echo -e "${CLR_CYAN}----------------------------------------------------------------------${CLR_RESET}"
         ui_menu_item "0" "${TXT_OPT_EXIT}" ""
         echo -e "${CLR_CYAN}======================================================================${CLR_RESET}"
@@ -423,6 +449,7 @@ main_menu() {
             3) step2_bbr; ui_pause ;;
             4) step3_3xui; ui_pause ;;
             5) setup_tg_config; ui_pause ;;
+            9) uninstall_all; ui_pause ;;
             0)
                 echo -e "${CLR_GREEN}${TXT_BYE}${CLR_RESET}"
                 exit 0
@@ -452,6 +479,9 @@ cli_dispatch() {
             ;;
         tg|telegram|5)
             setup_tg_config
+            ;;
+        uninstall|remove|9)
+            uninstall_all
             ;;
         -v|--version)
             echo "${APP_NAME} v${APP_VERSION}"
