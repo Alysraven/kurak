@@ -254,10 +254,22 @@ ui_pause() {
     read -rp "$TXT_PAUSE" dummy
 }
 
-# 步骤 1：系统更新
+# 步骤 1：系统更新 (完全自动化静默模式，自动跳过 needrestart 弹窗)
 step1_update() {
     echo -e "${CLR_BLUE}[INFO] ${TXT_STEP1_START}${CLR_RESET}"
-    apt update && apt upgrade -y
+
+    # 禁用任何交互式弹窗
+    export DEBIAN_FRONTEND=noninteractive
+    export NEEDRESTART_MODE=a
+    export NEEDRESTART_SUSPEND=1
+
+    # 如果系统安装了 needrestart，配置其自动重启服务而不弹出 UI 窗口
+    if [ -f /etc/needrestart/needrestart.conf ]; then
+        sed -i "s/#\$nrconf{restart} = 'i';/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf 2>/dev/null || true
+        sed -i "s/\$nrconf{restart} = 'i';/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf 2>/dev/null || true
+    fi
+
+    apt update && apt -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade -y
     echo -e "${CLR_GREEN}[OK] ${TXT_STEP1_OK}${CLR_RESET}"
 }
 
