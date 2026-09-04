@@ -254,9 +254,63 @@ ui_pause() {
     read -rp "$TXT_PAUSE" dummy
 }
 
+# 等待后台 apt/dpkg 锁释放 (防止云厂商/系统后台自动更新抢占导致安装失败)
+wait_for_apt_lock() {
+    local max_wait=60
+    local count=0
+    while fuser /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1 || pgrep -f "(apt-get|dpkg|unattended-upgrades)" >/dev/null 2>&1; do
+        if [ $count -eq 0 ]; then
+            echo -e "${CLR_YELLOW}[提示] 检测到系统后台正在进行自动更新 (apt 被占用)，正在等待其完成释放锁...${CLR_RESET}"
+        fi
+        sleep 2
+        count=$((count + 2))
+        if [ $count -ge $max_wait ]; then
+            echo -e "${CLR_YELLOW}[警告] 等待后台更新超时，正在尝试平滑解除锁...${CLR_RESET}"
+            killall apt-get apt unattended-upgrade 2>/dev/null || true
+            sleep 2
+            dpkg --configure -a >/dev/null 2>&1 || true
+            break
+        fi
+    done
+}
+
+# 自动放行防火墙必要端口 (39000, 80, 443, 22)
+auto_configure_firewall() {
+    local port="${XUI_PANEL_PORT:-39000}"
+    echo -e "${CLR_BLUE}[INFO] 正在检查并自动放行防火墙端口 (${port}, 80, 443, 22)...${CLR_RESET}"
+
+    # UFW 防火墙放行
+    if command -v ufw >/dev/null 2>&1; then
+        ufw allow 22/tcp >/dev/null 2>&1 || true
+        ufw allow 80/tcp >/dev/null 2>&1 || true
+        ufw allow 443/tcp >/dev/null 2>&1 || true
+        ufw allow "${port}/tcp" >/dev/null 2>&1 || true
+    fi
+
+    # Firewalld 防火墙放行
+    if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
+        firewall-cmd --zone=public --add-port=22/tcp --permanent >/dev/null 2>&1 || true
+        firewall-cmd --zone=public --add-port=80/tcp --permanent >/dev/null 2>&1 || true
+        firewall-cmd --zone=public --add-port=443/tcp --permanent >/dev/null 2>&1 || true
+        firewall-cmd --zone=public --add-port="${port}/tcp" --permanent >/dev/null 2>&1 || true
+        firewall-cmd --reload >/dev/null 2>&1 || true
+    fi
+
+    # iptables 基础放行
+    if command -v iptables >/dev/null 2>&1; then
+        iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT 2>/dev/null || true
+        iptables -I INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || true
+        iptables -I INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || true
+    fi
+    echo -e "${CLR_GREEN}[OK] 防火墙端口已自动放行！${CLR_RESET}"
+}
+
 # 步骤 1：系统更新 (完全自动化静默模式，自动跳过 needrestart 弹窗)
 step1_update() {
     echo -e "${CLR_BLUE}[INFO] ${TXT_STEP1_START}${CLR_RESET}"
+
+    # 优先等待后台 apt 锁释放
+    wait_for_apt_lock
 
     # 禁用任何交互式弹窗
     export DEBIAN_FRONTEND=noninteractive
@@ -269,7 +323,8 @@ step1_update() {
         sed -i "s/\$nrconf{restart} = 'i';/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf 2>/dev/null || true
     fi
 
-    apt update && apt -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade -y
+    dpkg --configure -a >/dev/null 2>&1 || true
+    apt-get update -y && apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade -y
     echo -e "${CLR_GREEN}[OK] ${TXT_STEP1_OK}${CLR_RESET}"
 }
 
@@ -289,8 +344,12 @@ EOF
 # 步骤 3：安装 3x-ui (指定端口 39000，其余配置全自动静默默认)
 step3_3xui() {
     echo -e "${CLR_BLUE}[INFO] ${TXT_STEP3_START}${CLR_RESET}"
+
+    # 确保 apt 锁空闲
+    wait_for_apt_lock
+
     if ! command -v curl >/dev/null 2>&1; then
-        apt update -y && apt install -y curl
+        apt-get update -y && apt-get install -y curl
     fi
 
     # 注入全自动环境变量：指定端口 39000，SSL 按 3x-ui 官方默认使用 IP 证书 (https)
@@ -299,7 +358,19 @@ step3_3xui() {
     export XUI_PANEL_PORT="39000"
     export XUI_SSL_MODE="ip"
 
+    # 执行官方安装
     bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+
+    # 确保服务已激活启动
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    systemctl enable x-ui >/dev/null 2>&1 || true
+    if ! systemctl is-active --quiet x-ui; then
+        systemctl restart x-ui >/dev/null 2>&1 || true
+    fi
+
+    # 自动开放防火墙端口 (39000, 80, 443)
+    auto_configure_firewall
+
     echo -e "${CLR_GREEN}[OK] ${TXT_STEP3_OK}${CLR_RESET}"
 
     # 发送 Telegram 通知 (若提供了 TG_TOKEN 和 TG_CHAT_ID)
