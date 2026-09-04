@@ -274,20 +274,19 @@ wait_for_apt_lock() {
     done
 }
 
-# 自动放行防火墙必要端口 (39000, 80, 443, 22)
+# 自动放行防火墙必要端口 (仅在防火墙处于开启状态时静默放行，默认不干预系统)
 auto_configure_firewall() {
     local port="${XUI_PANEL_PORT:-39000}"
-    echo -e "${CLR_BLUE}[INFO] 正在检查并自动放行防火墙端口 (${port}, 80, 443, 22)...${CLR_RESET}"
 
-    # UFW 防火墙放行
-    if command -v ufw >/dev/null 2>&1; then
+    # 仅当检测到 UFW 处于活跃开启状态时才执行放行
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
         ufw allow 22/tcp >/dev/null 2>&1 || true
         ufw allow 80/tcp >/dev/null 2>&1 || true
         ufw allow 443/tcp >/dev/null 2>&1 || true
         ufw allow "${port}/tcp" >/dev/null 2>&1 || true
     fi
 
-    # Firewalld 防火墙放行
+    # 仅当检测到 firewalld 处于活跃开启状态时才执行放行
     if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
         firewall-cmd --zone=public --add-port=22/tcp --permanent >/dev/null 2>&1 || true
         firewall-cmd --zone=public --add-port=80/tcp --permanent >/dev/null 2>&1 || true
@@ -295,14 +294,6 @@ auto_configure_firewall() {
         firewall-cmd --zone=public --add-port="${port}/tcp" --permanent >/dev/null 2>&1 || true
         firewall-cmd --reload >/dev/null 2>&1 || true
     fi
-
-    # iptables 基础放行
-    if command -v iptables >/dev/null 2>&1; then
-        iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT 2>/dev/null || true
-        iptables -I INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || true
-        iptables -I INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || true
-    fi
-    echo -e "${CLR_GREEN}[OK] 防火墙端口已自动放行！${CLR_RESET}"
 }
 
 # 步骤 1：系统更新 (完全自动化静默模式，自动跳过 needrestart 弹窗)
