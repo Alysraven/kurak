@@ -254,26 +254,6 @@ ui_pause() {
     read -rp "$TXT_PAUSE" dummy
 }
 
-# 等待后台 apt/dpkg 锁释放 (防止云厂商/系统后台自动更新抢占导致安装失败)
-wait_for_apt_lock() {
-    local max_wait=60
-    local count=0
-    while fuser /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1 || pgrep -f "(apt-get|dpkg|unattended-upgrades)" >/dev/null 2>&1; do
-        if [ $count -eq 0 ]; then
-            echo -e "${CLR_YELLOW}[提示] 检测到系统后台正在进行自动更新 (apt 被占用)，正在等待其完成释放锁...${CLR_RESET}"
-        fi
-        sleep 2
-        count=$((count + 2))
-        if [ $count -ge $max_wait ]; then
-            echo -e "${CLR_YELLOW}[警告] 等待后台更新超时，正在尝试平滑解除锁...${CLR_RESET}"
-            killall apt-get apt unattended-upgrade 2>/dev/null || true
-            sleep 2
-            dpkg --configure -a >/dev/null 2>&1 || true
-            break
-        fi
-    done
-}
-
 # 自动放行防火墙必要端口 (仅在防火墙处于开启状态时静默放行，默认不干预系统)
 auto_configure_firewall() {
     local port="${XUI_PANEL_PORT:-39000}"
@@ -300,9 +280,6 @@ auto_configure_firewall() {
 step1_update() {
     echo -e "${CLR_BLUE}[INFO] ${TXT_STEP1_START}${CLR_RESET}"
 
-    # 优先等待后台 apt 锁释放
-    wait_for_apt_lock
-
     # 禁用任何交互式弹窗
     export DEBIAN_FRONTEND=noninteractive
     export NEEDRESTART_MODE=a
@@ -314,8 +291,9 @@ step1_update() {
         sed -i "s/\$nrconf{restart} = 'i';/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf 2>/dev/null || true
     fi
 
-    dpkg --configure -a >/dev/null 2>&1 || true
-    apt-get update -y && apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade -y
+    # 使用 APT 原生锁机制 (无锁时 0 延迟秒级执行，真实占用时由 APT 原生排队，杜绝误报)
+    apt-get update -y -o DPkg::Lock::Timeout=60 && \
+    apt-get -o DPkg::Lock::Timeout=60 -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade -y
     echo -e "${CLR_GREEN}[OK] ${TXT_STEP1_OK}${CLR_RESET}"
 }
 
@@ -336,11 +314,8 @@ EOF
 step3_3xui() {
     echo -e "${CLR_BLUE}[INFO] ${TXT_STEP3_START}${CLR_RESET}"
 
-    # 确保 apt 锁空闲
-    wait_for_apt_lock
-
     if ! command -v curl >/dev/null 2>&1; then
-        apt-get update -y && apt-get install -y curl
+        apt-get update -y -o DPkg::Lock::Timeout=60 && apt-get install -y -o DPkg::Lock::Timeout=60 curl
     fi
 
     # 注入全自动环境变量：指定端口 39000，SSL 按 3x-ui 官方默认使用 IP 证书 (https)
