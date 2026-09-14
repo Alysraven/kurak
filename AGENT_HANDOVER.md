@@ -1,4 +1,4 @@
-﻿# 🤖 KURAK 项目 Agent 交接文档 (Handover Document)
+# 🤖 KURAK 项目 Agent 交接文档 (Handover Document)
 
 > **文档生成时间**：2026-09-14  
 > **文档适用对象**：后续接手本项目开发的任意 AI Agent / 开发者  
@@ -84,6 +84,17 @@
 
 - 命令直达：`kurak uninstall` 或 `kurak 9`。
 - 停止并注销 `x-ui` 服务，清理 `/usr/local/x-ui`、`/etc/x-ui`、服务单元及 `kurak` 全局快捷键，使系统完全复原。
+
+### 3.5 SSH Root 密码登录配置模块 (`enable_root_login`)
+
+- 命令直达：`kurak root` 或 `kurak ssh` 或 `kurak 6`（支持无交互传参：`kurak root [新密码]`）。
+- 菜单直达：`[ 6 ] 开启 SSH Root 密码登录`。
+- **底层执行细节**：
+  1. 自动备份 `/etc/ssh/sshd_config`；
+  2. 自动开启 `PermitRootLogin yes`、`PasswordAuthentication yes`、`KbdInteractiveAuthentication yes`；
+  3. 深度兼容云厂商：针对 GCP、AWS 等包含 `/etc/ssh/sshd_config.d/*.conf`（如 `50-cloud-init.conf`）的覆盖配置同步强制开启；
+  4. 重启系统 SSH 服务 (`systemctl restart sshd || restart ssh`)；
+  5. 引导用户安全设置/修改 root 密码（支持非交互一键传参重置）。
 
 ---
 

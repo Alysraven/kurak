@@ -64,7 +64,7 @@ set_language_strings() {
             TXT_OPT_STEP3="第三步：一鍵安裝 3x-ui 面板"
             TXT_OPT_STEP3_DESC="執行官方 3x-ui 安裝程式"
             TXT_OPT_EXIT="退出腳本"
-            TXT_PROMPT="請輸入選項數字 [0-4]: "
+            TXT_PROMPT="請輸入選項數字: "
             TXT_STEP1_START="第一步：正在執行系統與軟體包更新..."
             TXT_STEP1_OK="第一步：系統更新完成！"
             TXT_STEP2_START="第二步：配置並應用 BBR 擁塞控制..."
@@ -95,7 +95,7 @@ set_language_strings() {
             TXT_OPT_STEP3="Step 3: Install 3x-ui Panel"
             TXT_OPT_STEP3_DESC="Execute official 3x-ui installer"
             TXT_OPT_EXIT="Exit"
-            TXT_PROMPT="Please select an option [0-4]: "
+            TXT_PROMPT="Please select an option: "
             TXT_STEP1_START="Step 1: Updating and upgrading system packages..."
             TXT_STEP1_OK="Step 1: System upgrade completed!"
             TXT_STEP2_START="Step 2: Configuring and enabling BBR..."
@@ -126,7 +126,7 @@ set_language_strings() {
             TXT_OPT_STEP3="第三步：一键安装 3x-ui 面板"
             TXT_OPT_STEP3_DESC="执行官方 3x-ui 安装脚本"
             TXT_OPT_EXIT="退出脚本"
-            TXT_PROMPT="请输入选项数字 [0-4]: "
+            TXT_PROMPT="请输入选项数字: "
             TXT_STEP1_START="第一步：正在执行系统与软件包更新..."
             TXT_STEP1_OK="第一步：系统更新完成！"
             TXT_STEP2_START="第二步：配置并应用 BBR 拥塞控制..."
@@ -462,6 +462,75 @@ uninstall_all() {
     fi
 }
 
+# 开启 SSH Root 密码登录
+enable_root_login() {
+    echo -e "${CLR_CYAN}======================================================================${CLR_RESET}"
+    echo -e "                   ${CLR_BOLD}开启 SSH Root 密码登录${CLR_RESET}"
+    echo -e "${CLR_CYAN}======================================================================${CLR_RESET}"
+
+    local sshd_file="/etc/ssh/sshd_config"
+    if [ ! -f "$sshd_file" ]; then
+        echo -e "${CLR_RED}[错误] 未检测到 ${sshd_file}，系统可能未安装 OpenSSH 服务。${CLR_RESET}"
+        return 1
+    fi
+
+    echo -e "${CLR_BLUE}[INFO] 正在配置 SSH 服务允许 root 远程密码登录...${CLR_RESET}"
+
+    # 1. 备份原 sshd 配置文件
+    cp "$sshd_file" "${sshd_file}.bak.$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+
+    # 2. 修改主配置文件 /etc/ssh/sshd_config
+    if grep -q "^#\?PermitRootLogin" "$sshd_file"; then
+        sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/g' "$sshd_file"
+    else
+        echo "PermitRootLogin yes" >> "$sshd_file"
+    fi
+
+    if grep -q "^#\?PasswordAuthentication" "$sshd_file"; then
+        sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/g' "$sshd_file"
+    else
+        echo "PasswordAuthentication yes" >> "$sshd_file"
+    fi
+
+    if grep -q "^#\?KbdInteractiveAuthentication" "$sshd_file"; then
+        sed -i 's/^#\?KbdInteractiveAuthentication.*/KbdInteractiveAuthentication yes/g' "$sshd_file"
+    else
+        echo "KbdInteractiveAuthentication yes" >> "$sshd_file"
+    fi
+
+    # 3. 兼容处理 /etc/ssh/sshd_config.d/ 下的云厂商覆盖配置 (如 GCP/AWS 的 50-cloud-init.conf)
+    if [ -d /etc/ssh/sshd_config.d ]; then
+        sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/g' /etc/ssh/sshd_config.d/*.conf 2>/dev/null || true
+        sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/g' /etc/ssh/sshd_config.d/*.conf 2>/dev/null || true
+        sed -i 's/^#\?KbdInteractiveAuthentication.*/KbdInteractiveAuthentication yes/g' /etc/ssh/sshd_config.d/*.conf 2>/dev/null || true
+    fi
+
+    # 4. 重启 SSH 服务生效
+    if systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null || service sshd restart 2>/dev/null || service ssh restart 2>/dev/null; then
+        echo -e "${CLR_GREEN}[OK] SSH 配置文件修改完成，SSH 服务已成功重启！${CLR_RESET}"
+    else
+        echo -e "${CLR_YELLOW}[WARN] 自动重启 SSH 服务未返回成功，可能需要手动执行 service ssh restart。${CLR_RESET}"
+    fi
+
+    # 5. 设置 root 密码
+    echo ""
+    if [ -n "$1" ]; then
+        echo "root:$1" | chpasswd
+        echo -e "${CLR_GREEN}[OK] root 用户登录密码已成功设置为: $1${CLR_RESET}"
+    else
+        echo -e "${CLR_YELLOW}请为 root 用户设置登录密码（输入时字符不回显属于正常现象）：${CLR_RESET}"
+        passwd root
+    fi
+
+    local server_ip
+    server_ip=$(sys_get_ip)
+    echo ""
+    echo -e "${CLR_GREEN}======================================================================${CLR_RESET}"
+    echo -e "   ${CLR_BOLD}[OK] SSH Root 密码登录已全面开启！${CLR_RESET}"
+    echo -e "   连接主机: ${server_ip} | 端口: 22 | 登录账号: root"
+    echo -e "${CLR_GREEN}======================================================================${CLR_RESET}"
+}
+
 # 交互式主菜单
 main_menu() {
     while true; do
@@ -474,6 +543,7 @@ main_menu() {
         ui_menu_item "4" "${TXT_OPT_STEP3}" "${TXT_OPT_STEP3_DESC}"
         echo -e "${CLR_CYAN}---------------------------- [ 工具与设置 ] --------------------------${CLR_RESET}"
         ui_menu_item "5" "配置 Telegram 部署通知" "保存在 VPS 本地，安装完自动将账号密码推到手机"
+        ui_menu_item "6" "开启 SSH Root 密码登录" "修改 sshd 配置并为 root 用户设置密码"
         ui_menu_item "9" "彻底卸载 3x-ui 与本脚本" "停止并清理面板服务与全局快捷键"
         echo -e "${CLR_CYAN}----------------------------------------------------------------------${CLR_RESET}"
         ui_menu_item "0" "${TXT_OPT_EXIT}" ""
@@ -486,6 +556,7 @@ main_menu() {
             3) step2_bbr; ui_pause ;;
             4) step3_3xui; ui_pause ;;
             5) setup_tg_config; ui_pause ;;
+            6) enable_root_login; ui_pause ;;
             9) uninstall_all; ui_pause ;;
             0)
                 echo -e "${CLR_GREEN}${TXT_BYE}${CLR_RESET}"
@@ -516,6 +587,9 @@ cli_dispatch() {
             ;;
         tg|telegram|5)
             setup_tg_config
+            ;;
+        root|ssh|6)
+            enable_root_login "$2"
             ;;
         uninstall|remove|9)
             uninstall_all

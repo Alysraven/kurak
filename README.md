@@ -49,10 +49,12 @@ k                   # 同样可直接唤出菜单
 | 命令 | 说明 |
 | :--- | :--- |
 | `kurak 1` 或 `kurak auto` | **一键全自动顺序执行全部 3 个步骤** |
+| `kurak root` (或 `kurak 6`) | 开启 SSH Root 密码登录 (自动配置 sshd 并重置 root 密码) |
 | `kurak tg` (或 `kurak 5`) | 配置 Telegram 机器人推送凭据 (安全保存在本地) |
 | `kurak update` (或 `kurak 2`) | 仅执行第 1 步：系统更新升级 (`apt update && apt upgrade -y`) |
 | `kurak bbr` (或 `kurak 3`) | 仅执行第 2 步：配置并启用 BBR 拥塞控制 (`99-bbr.conf`) |
 | `kurak 3x-ui` (或 `kurak 4`) | 仅执行第 3 步：下载并安装官方 3x-ui 面板 |
+| `kurak uninstall` (或 `kurak 9`) | 一键彻底卸载 3x-ui 与本脚本 |
 | `kurak tw` | 以繁體中文模式啟動選單 |
 | `kurak en` | Launch menu in English |
 
