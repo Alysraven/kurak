@@ -154,7 +154,21 @@ check_root() {
 # 自动安装与快捷方式配置
 ensure_installed() {
     mkdir -p "$INSTALL_DIR"
-    echo "LANG_MODE=\"${LANG_MODE}\"" > "$CONFIG_FILE"
+    chmod 700 "$INSTALL_DIR" 2>/dev/null || true
+
+    # 安全初始化或更新本地配置文件，确保权限为 600 (仅 root 可读写)
+    if [ ! -f "$CONFIG_FILE" ]; then
+        touch "$CONFIG_FILE"
+        chmod 600 "$CONFIG_FILE"
+        echo "LANG_MODE=\"${LANG_MODE}\"" > "$CONFIG_FILE"
+    else
+        chmod 600 "$CONFIG_FILE" 2>/dev/null || true
+        if grep -q '^LANG_MODE=' "$CONFIG_FILE"; then
+            sed -i "s/^LANG_MODE=.*/LANG_MODE=\"${LANG_MODE}\"/" "$CONFIG_FILE"
+        else
+            echo "LANG_MODE=\"${LANG_MODE}\"" >> "$CONFIG_FILE"
+        fi
+    fi
 
     local current_script=""
     if [ -f "$0" ] && [[ "$0" != *"/dev/fd/"* ]]; then
@@ -516,7 +530,7 @@ enable_root_login() {
     echo ""
     if [ -n "$1" ]; then
         echo "root:$1" | chpasswd
-        echo -e "${CLR_GREEN}[OK] root 用户登录密码已成功设置为: $1${CLR_RESET}"
+        echo -e "${CLR_GREEN}[OK] root 用户登录密码已成功设置！${CLR_RESET}"
     else
         echo -e "${CLR_YELLOW}请为 root 用户设置登录密码（输入时字符不回显属于正常现象）：${CLR_RESET}"
         passwd root

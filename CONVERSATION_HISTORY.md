@@ -1,4 +1,4 @@
-﻿# 📜 KURAK 项目历史对话与开发决策全景记录 (Conversation & Decision History)
+# 📜 KURAK 项目历史对话与开发决策全景记录 (Conversation & Decision History)
 
 > **项目名称**：KURAK (`kurak.sh`)  
 > **所属仓库**：`https://github.com/Alysraven/kurak.git`  
@@ -24,7 +24,7 @@
 
 ### 用户诉求：
 1. 新建脚本命名为 `kurak.sh`。
-2. **严正要求**：整个代码库、注释、提交历史、文档中，**绝对不要有任何原版项目（kejilion）相关的字眼和信息**。
+2. **严正要求**：整个代码库、注释、提交历史、文档中，**绝对不要有任何原版项目的字眼和信息**。
 3. 核心功能精简为一键全自动顺序执行 3 个步骤：
    - 步骤 1：系统更新升级 (`apt update && apt upgrade -y`)
    - 步骤 2：启用 BBR 拥塞控制 (`net.ipv4.tcp_congestion_control=bbr`)
@@ -32,7 +32,7 @@
 4. 支持多语言（`tw` 繁体中文、`en` 英文、默认简体中文），并支持简短获取链接。
 
 ### 开发与决策：
-- 将原版完整备份至隔离目录 `d:\Syncthing\Project\kejilion-sh-v0`。
+- 将原版完整备份至独立隔离目录 `d:\Syncthing\Project\backup-sh-v0`。
 - 在 `d:\Syncthing\Project\kurak` 全新手工编写纯净的单文件 `kurak.sh`，实现内置多语言字典、CLI 命令行参数分发（`kurak 1`、`kurak bbr` 等）、以及自动创建全局软链接（`kurak` 与 `k`）。
 - 编写 `install.sh` 远程引导安装程序与 `.gitattributes`（强制 Linux `LF` 换行符）。
 

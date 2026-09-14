@@ -14,11 +14,11 @@
 - **GitHub 仓库**：`https://github.com/Alysraven/kurak.git`
 - **GitHub 作者账号**：`Alysraven`
 - **GitHub 绑定邮箱**：`372339528@qq.com`
-- **原版历史备份**：`d:\Syncthing\Project\kejilion-sh-v0`（独立存档，已与本项目彻底物理隔离）
+- **原版历史备份**：`d:\Syncthing\Project\backup-sh-v0`（独立存档，已与本项目彻底物理隔离）
 
 > [!CAUTION]
 > ### 🚨 第一铁律：绝对去痕化
-> **代码库、脚本内容、提交日志 (Commit Messages)、文档 (README/注释)、链接中，绝对不能出现任何 `kejilion` 相关的字眼或痕迹！**  
+> **代码库、脚本内容、提交日志 (Commit Messages)、文档 (README/注释)、链接中，绝对不能出现任何上游原版项目的字眼或痕迹！**  
 > 所有组件与命名必须严格统一为 `kurak`。
 
 > [!WARNING]
